@@ -173,6 +173,70 @@ const getAll = async (req: Request, res: Response, next: NextFunction): Promise<
   });
 };
 
+const getShortPodcasts = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.max(Number(req.query.limit) || 10, 1);
+  const skip = (page - 1) * limit;
+
+  if (page <= 0 || limit <= 0) {
+    return next(createError(httpStatus.BAD_REQUEST, "Invalid pagination parameters"));
+  }
+
+  const [error, podcasts] = await to(
+    Podcast.find({ audioDuration: { $lt: 600 } }) // Filtering podcasts less than 10 minutes (600 seconds)
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "creator",
+        select: "user -_id",
+        populate: {
+          path: "user",
+          select: "name -_id",
+        },
+      })
+      .populate({
+        path: "category",
+        select: "title",
+      })
+      .populate({
+        path: "subCategory",
+        select: "title",
+      })
+      .lean(),
+  );
+
+  if (error) return next(error);
+
+  if (!podcasts || podcasts.length === 0) {
+    return res.status(httpStatus.OK).json({
+      success: true,
+      message: "No short podcasts found!",
+      data: [],
+      pagination: {
+        page,
+        limit,
+        total: await Podcast.countDocuments({ audioDuration: { $lt: 600 } }),
+      },
+    });
+  }
+
+  const formattedPodcasts = podcasts.map((podcast: any) => ({
+    ...podcast,
+    audioDuration: (podcast.audioDuration / 60).toFixed(2) + " min",
+  }));
+
+  return res.status(httpStatus.OK).json({
+    success: true,
+    message: "Success",
+    data: formattedPodcasts,
+    pagination: {
+      page,
+      limit,
+      total: await Podcast.countDocuments({ audioDuration: { $lt: 600 } }),
+    },
+  });
+};
+
 const update = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const { categoryId, subCategoryId, title, description, location, coverUrl, podcastAudioUrl } =
     req.body;
@@ -303,6 +367,7 @@ const PodcastController = {
   create,
   get,
   getAll,
+  getShortPodcasts,
   update,
   remove,
 };
