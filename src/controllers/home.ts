@@ -1,7 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import to from "await-to-ts";
 import Category from "@models/category";
-import Creator from "@models/creator";
 import httpStatus from "http-status";
 import Podcast from "@models/podcast";
 import Admin from "@models/admin";
@@ -95,8 +93,13 @@ const homeController = async (req: Request, res: Response, next: NextFunction): 
     ]);
 
     /* Podcasts */
-    const fetchPodcasts = async (sortField: string, limit: number, locationFilter: boolean) => {
-      const query = locationFilter && location ? { location } : {};
+    const fetchPodcasts = async (
+      sortField: string,
+      limit: number,
+      locationFilter: boolean,
+      filter?: any,
+    ) => {
+      const query = { ...filter, ...(locationFilter && location ? { location } : {}) };
       const podcasts = await Podcast.find(query)
         .select("title category cover audioDuration")
         .populate({
@@ -108,8 +111,7 @@ const homeController = async (req: Request, res: Response, next: NextFunction): 
         .lean();
 
       if (locationFilter && podcasts.length === 0 && location) {
-        // Fallback to original query if location-filtered query yields no results
-        return Podcast.find()
+        return Podcast.find(filter || {})
           .select("title category cover audioDuration")
           .populate({
             path: "category",
@@ -119,20 +121,24 @@ const homeController = async (req: Request, res: Response, next: NextFunction): 
           .limit(limit)
           .lean();
       }
-
       return podcasts;
     };
 
     const newPodcastsPromise = fetchPodcasts("createdAt", 2, true);
     const popularPodcastsPromise = fetchPodcasts("totalLikes", 3, true);
+    const shortPodcastsPromise = fetchPodcasts("createdAt", 4, false, {
+      audioDuration: { $lt: 600 },
+    });
 
-    const [categories, admin, creators, newPodcasts, popularPodcasts] = await Promise.all([
-      categoriesPromise,
-      adminPromise,
-      creatorsPromise,
-      newPodcastsPromise,
-      popularPodcastsPromise,
-    ]);
+    const [categories, admin, creators, newPodcasts, popularPodcasts, shortPodcasts] =
+      await Promise.all([
+        categoriesPromise,
+        adminPromise,
+        creatorsPromise,
+        newPodcastsPromise,
+        popularPodcastsPromise,
+        shortPodcastsPromise,
+      ]);
 
     const formatPodcasts = (podcasts: any[]) =>
       podcasts.map((podcast) => ({
@@ -150,6 +156,7 @@ const homeController = async (req: Request, res: Response, next: NextFunction): 
         creators,
         newPodcasts: formatPodcasts(newPodcasts),
         popularPodcasts: formatPodcasts(popularPodcasts),
+        shortPodcasts: formatPodcasts(shortPodcasts),
       },
     });
   } catch (error) {
