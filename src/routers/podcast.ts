@@ -7,7 +7,7 @@ import fileHandler from "@middlewares/fileHandler";
 
 const router = express.Router();
 
-router.get("/short", authorize, PodcastController.getShortPodcasts);
+router.get("/short", authorize, PodcastServices.getShortPodcasts);
 router.get("/popular", authorize, PodcastServices.popularPodcasts);
 router.get("/latest", authorize, PodcastServices.latestPodcasts);
 router.post("/create", fileUpload(), fileHandler, authorize, PodcastController.create);

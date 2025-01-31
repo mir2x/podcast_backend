@@ -10,7 +10,7 @@ const authorization_1 = require("../middlewares/authorization");
 const express_fileupload_1 = __importDefault(require("express-fileupload"));
 const fileHandler_1 = __importDefault(require("../middlewares/fileHandler"));
 const router = express_1.default.Router();
-router.get("/short", authorization_1.authorize, podcast_1.default.getShortPodcasts);
+router.get("/short", authorization_1.authorize, podcast_2.default.getShortPodcasts);
 router.get("/popular", authorization_1.authorize, podcast_2.default.popularPodcasts);
 router.get("/latest", authorization_1.authorize, podcast_2.default.latestPodcasts);
 router.post("/create", (0, express_fileupload_1.default)(), fileHandler_1.default, authorization_1.authorize, podcast_1.default.create);
