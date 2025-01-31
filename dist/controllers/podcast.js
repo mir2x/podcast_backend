@@ -156,6 +156,62 @@ const getAll = async (req, res, next) => {
         },
     });
 };
+const getShortPodcasts = async (req, res, next) => {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+    if (page <= 0 || limit <= 0) {
+        return next((0, http_errors_1.default)(http_status_1.default.BAD_REQUEST, "Invalid pagination parameters"));
+    }
+    const [error, podcasts] = await (0, await_to_ts_1.default)(podcast_1.default.find({ audioDuration: { $lt: 600 } }) // Filtering podcasts less than 10 minutes (600 seconds)
+        .skip(skip)
+        .limit(limit)
+        .populate({
+        path: "creator",
+        select: "user -_id",
+        populate: {
+            path: "user",
+            select: "name -_id",
+        },
+    })
+        .populate({
+        path: "category",
+        select: "title",
+    })
+        .populate({
+        path: "subCategory",
+        select: "title",
+    })
+        .lean());
+    if (error)
+        return next(error);
+    if (!podcasts || podcasts.length === 0) {
+        return res.status(http_status_1.default.OK).json({
+            success: true,
+            message: "No short podcasts found!",
+            data: [],
+            pagination: {
+                page,
+                limit,
+                total: await podcast_1.default.countDocuments({ audioDuration: { $lt: 600 } }),
+            },
+        });
+    }
+    const formattedPodcasts = podcasts.map((podcast) => ({
+        ...podcast,
+        audioDuration: (podcast.audioDuration / 60).toFixed(2) + " min",
+    }));
+    return res.status(http_status_1.default.OK).json({
+        success: true,
+        message: "Success",
+        data: formattedPodcasts,
+        pagination: {
+            page,
+            limit,
+            total: await podcast_1.default.countDocuments({ audioDuration: { $lt: 600 } }),
+        },
+    });
+};
 const update = async (req, res, next) => {
     const { categoryId, subCategoryId, title, description, location, coverUrl, podcastAudioUrl } = req.body;
     let error, podcast;
@@ -274,6 +330,7 @@ const PodcastController = {
     create,
     get,
     getAll,
+    getShortPodcasts,
     update,
     remove,
 };

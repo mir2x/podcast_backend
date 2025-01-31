@@ -91,8 +91,8 @@ const homeController = async (req, res, next) => {
             },
         ]);
         /* Podcasts */
-        const fetchPodcasts = async (sortField, limit, locationFilter) => {
-            const query = locationFilter && location ? { location } : {};
+        const fetchPodcasts = async (sortField, limit, locationFilter, filter) => {
+            const query = { ...filter, ...(locationFilter && location ? { location } : {}) };
             const podcasts = await podcast_1.default.find(query)
                 .select("title category cover audioDuration")
                 .populate({
@@ -103,8 +103,7 @@ const homeController = async (req, res, next) => {
                 .limit(limit)
                 .lean();
             if (locationFilter && podcasts.length === 0 && location) {
-                // Fallback to original query if location-filtered query yields no results
-                return podcast_1.default.find()
+                return podcast_1.default.find(filter || {})
                     .select("title category cover audioDuration")
                     .populate({
                     path: "category",
@@ -118,12 +117,16 @@ const homeController = async (req, res, next) => {
         };
         const newPodcastsPromise = fetchPodcasts("createdAt", 2, true);
         const popularPodcastsPromise = fetchPodcasts("totalLikes", 3, true);
-        const [categories, admin, creators, newPodcasts, popularPodcasts] = await Promise.all([
+        const shortPodcastsPromise = fetchPodcasts("createdAt", 4, false, {
+            audioDuration: { $lt: 600 },
+        });
+        const [categories, admin, creators, newPodcasts, popularPodcasts, shortPodcasts] = await Promise.all([
             categoriesPromise,
             adminPromise,
             creatorsPromise,
             newPodcastsPromise,
             popularPodcastsPromise,
+            shortPodcastsPromise,
         ]);
         const formatPodcasts = (podcasts) => podcasts.map((podcast) => ({
             ...podcast,
@@ -139,6 +142,7 @@ const homeController = async (req, res, next) => {
                 creators,
                 newPodcasts: formatPodcasts(newPodcasts),
                 popularPodcasts: formatPodcasts(popularPodcasts),
+                shortPodcasts: formatPodcasts(shortPodcasts),
             },
         });
     }
